@@ -17,7 +17,7 @@ const REDACTED = '«вычищено сервером MCP»';
  *
  * 🔑 Поэтому отказ здесь, а не предупреждение в описании: описание модель читает, но не
  * обязана слушаться, а тут физически нет способа испортить конфиг незаметно. Рабочий путь
- * для тела конфига — `projects/RWXRAY/nodes/deploy-config.py`: он берёт токен из окружения,
+ * для тела конфига — `projects/RWXRAY/ops/deploy-config.py`: он берёт токен из окружения,
  * сохраняет бэкап, сливает поля локаций из живой панели и сверяет результат после заливки.
  */
 function findRedacted(value: unknown, path = 'config'): string | null {
@@ -148,7 +148,7 @@ export function registerInboundTools(
             name: z.string().optional().describe('New name'),
             // ⚠️ Тело xray-конфига целиком. Панель принимает его как есть и рестартует xray
             // НА ВСЕХ нодах профиля разом. Для боевого профиля пользоваться
-            // projects/RWXRAY/nodes/deploy-config.py: он делает бэкап, сверку и проверку
+            // projects/RWXRAY/ops/deploy-config.py: он делает бэкап, сверку и проверку
             // фактического egress после заливки.
             config: z
                 .record(z.string(), z.unknown())
@@ -157,7 +157,7 @@ export function registerInboundTools(
                     'Full xray config object — replaces the profile config and restarts every node '
                     + 'on the profile. ⛔ Do NOT build it from a profile you read through this MCP: '
                     + 'private keys come back redacted and you would overwrite them with the '
-                    + 'placeholder. Use projects/RWXRAY/nodes/deploy-config.py for the config body.',
+                    + 'placeholder. Use projects/RWXRAY/ops/deploy-config.py for the config body.',
                 ),
         },
         async (params) => {
@@ -171,7 +171,7 @@ export function registerInboundTools(
                                 `отказ: в ${hit} лежит «${REDACTED}» — это заглушка вычистки, а не `
                                 + 'настоящее значение. Заливка перезаписала бы секрет заглушкой и '
                                 + 'положила бы Reality на всём парке. Тело конфига правится через '
-                                + 'projects/RWXRAY/nodes/deploy-config.py (бэкап, поля локаций из '
+                                + 'projects/RWXRAY/ops/deploy-config.py (бэкап, поля локаций из '
                                 + 'живой панели, сверка после заливки).',
                             ),
                         );

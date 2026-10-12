@@ -71,7 +71,7 @@ export function registerAllResources(
 
     server.resource(
         'user-details',
-        new ResourceTemplate('remnawave://users/{uuid}', {
+        new ResourceTemplate('remnawave://users/{userId}', {
             list: undefined,
         }),
         {
@@ -79,9 +79,10 @@ export function registerAllResources(
             mimeType: 'application/json',
         },
         async (uri, params) => {
-            // Шаблон объявляет {uuid} — параметра `userId` в нём нет вовсе, и прежнее
-            // `params.userId` уходило в запрос как undefined (разбор Codex 13.09.2026).
-            const user = await client.getUserById(params.uuid as string);
+            // В 3.x у пользователя нет uuid — только числовой id, поэтому и параметр шаблона
+            // `{userId}`. Имя в шаблоне и в params должно совпадать: при расхождении в запрос
+            // уходил undefined (разбор Codex 13.09.2026).
+            const user = await client.getUserById(params.userId as string);
             return {
                 contents: [
                     {

@@ -10,10 +10,10 @@ import { toolResult, toolError } from './helpers.js';
  * ⚠️ `start` и `end` (YYYY-MM-DD) обязательны у всех четырёх: без них панель отвечает 400.
  * Поэтому они не `optional` — иначе тул выглядел бы работающим и падал бы на панели.
  *
- * Не заведены осознанно: POST-двойники `bandwidth-stats/nodes/usage` и `.../nodes/users` —
- * та же выборка, но с фильтром по списку `nodesUuids`; по одной ноде отвечает
- * `bandwidth_nodes_top_users`. ⛔ `nodes/realtime` не заведён потому, что путь мёртв: он
- * объявлен в контракте 3.0.0–3.3.0, а панель 3.2.1 отдаёт 404 (проверено 11.08.2026).
+ * POST-двойники `bandwidth-stats/nodes/usage` и `.../nodes/users` — та же выборка, но по
+ * списку нод `nodesUuids`: «кто ест трафик в группе локаций» одним вызовом вместо обхода нод.
+ * ⛔ `nodes/realtime` не заведён: путь объявлен в контракте 3.0.0–3.3.0, а панель 3.2.1
+ * отдавала на него 404 (проверено 11.08.2026); в контракте 3.4 его уже нет.
  */
 const period = {
     start: z.string().describe('Start date, YYYY-MM-DD (required by the panel)'),
@@ -89,7 +89,7 @@ export function registerBandwidthStatsTools(
                 .describe('Only users whose total usage over the period is >= this (bytes)'),
             limit: z.number().optional().describe('How many users to return, max 1000'),
             cursor: z
-                .string()
+                .number()
                 .optional()
                 .describe('nextCursor from the previous response; omit on the first request'),
         },
@@ -118,6 +118,45 @@ export function registerBandwidthStatsTools(
                     userId,
                     params,
                 );
+                return toolResult(result);
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.tool(
+        'bandwidth_nodes_users_usage',
+        'Per-user traffic over a period on a set of nodes, per node — raw totals in bytes',
+        {
+            nodesUuids: z.array(z.string().uuid()).min(1).describe('Node UUIDs to include'),
+            ...period,
+            minTotalBytes: z
+                .number()
+                .optional()
+                .describe('Only users whose total over the period is >= this (bytes)'),
+        },
+        async ({ nodesUuids, ...query }) => {
+            try {
+                const result = await client.getNodesUsageByUsers(query, nodesUuids);
+                return toolResult(result);
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.tool(
+        'bandwidth_nodes_group_top_users',
+        'Top users by traffic across a set of nodes over a period, with a daily sparkline',
+        {
+            nodesUuids: z.array(z.string().uuid()).min(1).describe('Node UUIDs to include'),
+            ...period,
+            topUsersLimit: z.number().optional().describe('How many top users to return, default 100'),
+        },
+        async ({ nodesUuids, ...query }) => {
+            try {
+                const result = await client.getNodesTopUsers(query, nodesUuids);
                 return toolResult(result);
             } catch (e) {
                 return toolError(e);

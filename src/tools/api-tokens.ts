@@ -8,6 +8,10 @@ export function registerApiTokenTools(server: McpServer, client: RemnawaveClient
         try { return toolResult(await client.getApiTokens()); } catch (e) { return toolError(e); }
     });
 
+    server.tool('api_tokens_scopes_list', 'List API token scopes: resources, their read/write scopes and the endpoints each one opens — use before api_tokens_create to grant less than "*"', {}, async () => {
+        try { return toolResult(await client.getApiTokenScopes()); } catch (e) { return toolError(e); }
+    });
+
     if (readonly) return;
 
     // ⚠️ Поля названы ровно как в контракте (`CreateApiTokenCommand`). Раньше тул принимал
@@ -19,7 +23,7 @@ export function registerApiTokenTools(server: McpServer, client: RemnawaveClient
         scopes: z
             .array(z.string())
             .optional()
-            .describe('Permission scopes, defaults to ["*"] — full access'),
+            .describe('Permission scopes (see api_tokens_scopes_list), defaults to ["*"] — full access'),
     }, async (params) => {
         try { return toolResult(await client.createApiToken(params)); } catch (e) { return toolError(e); }
     });

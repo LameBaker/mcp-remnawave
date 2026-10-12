@@ -39,6 +39,16 @@ export const listQueryParams = {
         .describe('Sort order, e.g. [{"id":"requestAt","desc":true}]'),
 };
 
+/**
+ * Форматы, которые панель проверяет регуляркой. Схема тула повторяет их, чтобы модель узнала
+ * правило из описания входа, а не из `Validation failed` после вызова.
+ */
+export const tagList = z
+    .array(z.string().max(36).regex(/^[A-Z0-9_:]+$/, 'A-Z, 0-9, _ and : only'))
+    .max(10);
+export const userTag = z.string().max(16).regex(/^[A-Z0-9_]+$/, 'A-Z, 0-9 and _ only');
+export const uuidList = z.array(z.string().uuid());
+
 export function toolResult(data: unknown) {
     return {
         content: [

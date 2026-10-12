@@ -1,6 +1,6 @@
 {
   "name": "remnawave-mcp",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "MCP server for Remnawave proxy management panel",
   "type": "module",
   "bin": {
@@ -14,7 +14,10 @@
     "typecheck": "tsc --noEmit",
     "test": "esbuild tests/regression.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/regression.mjs --external:@modelcontextprotocol/sdk --log-level=error && node node_modules/.cache/regression.mjs",
     "check:bodies": "npm run check:contract",
-    "check:contract": "esbuild tests/contract-coverage.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/contract-coverage.mjs --log-level=error && node node_modules/.cache/contract-coverage.mjs"
+    "check:contract": "esbuild tests/contract-coverage.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/contract-coverage.mjs --log-level=error && node node_modules/.cache/contract-coverage.mjs",
+    "check:requests": "esbuild tests/request-validation.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/request-validation.mjs --log-level=error && node node_modules/.cache/request-validation.mjs",
+    "check": "npm run typecheck && npm test && npm run check:contract && npm run check:requests && npm run docs:tools -- --check",
+    "docs:tools": "esbuild tests/readme-tools.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/readme-tools.mjs --external:@modelcontextprotocol/sdk --log-level=error && node node_modules/.cache/readme-tools.mjs"
   },
   "keywords": [
     "mcp",

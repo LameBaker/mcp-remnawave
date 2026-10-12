@@ -29,8 +29,8 @@ export function registerInfraBillingTools(server: McpServer, client: RemnawaveCl
 
     server.tool('billing_provider_create', 'Create a new billing provider', {
         name: z.string().describe('Provider name'),
-        faviconLink: z.string().optional().describe('Favicon URL'),
-        loginUrl: z.string().optional().describe('Login page URL'),
+        faviconLink: z.string().url().optional().describe('Favicon URL'),
+        loginUrl: z.string().url().optional().describe('Login page URL'),
     }, async (params) => {
         try { return toolResult(await client.createBillingProvider(params)); } catch (e) { return toolError(e); }
     });
@@ -38,8 +38,8 @@ export function registerInfraBillingTools(server: McpServer, client: RemnawaveCl
     server.tool('billing_provider_update', 'Update a billing provider', {
         uuid: z.string().uuid().describe('Provider UUID'),
         name: z.string().optional().describe('New name'),
-        faviconLink: z.string().optional().describe('New favicon URL'),
-        loginUrl: z.string().optional().describe('New login page URL'),
+        faviconLink: z.string().url().optional().describe('New favicon URL'),
+        loginUrl: z.string().url().optional().describe('New login page URL'),
     }, async (params) => {
         try { return toolResult(await client.updateBillingProvider(params)); } catch (e) { return toolError(e); }
     });
@@ -53,9 +53,12 @@ export function registerInfraBillingTools(server: McpServer, client: RemnawaveCl
     server.tool('billing_node_create', 'Create a billing node', {
         nodeUuid: z.string().uuid().describe('Node UUID'),
         providerUuid: z.string().uuid().describe('Provider UUID'),
-        nextBillingAt: z.string().optional().describe('Next billing date (ISO 8601)'),
-    }, async (params) => {
-        try { return toolResult(await client.createBillingNode(params)); } catch (e) { return toolError(e); }
+        // По контракту оба поля обязательны: `nextBillingAt` — строкой, `name` — ключом, хоть
+        // бы и null. Без них панель отклоняла создание всегда.
+        nextBillingAt: z.string().describe('Next billing date, ISO 8601 (e.g. 2026-11-01T00:00:00.000Z)'),
+        name: z.string().min(1).max(255).nullish().describe('Billing node name, null for none'),
+    }, async ({ name, ...params }) => {
+        try { return toolResult(await client.createBillingNode({ ...params, name: name ?? null })); } catch (e) { return toolError(e); }
     });
 
     server.tool('billing_node_update', 'Update a billing node', {

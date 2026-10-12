@@ -31,8 +31,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
  * Ключи, значение которых не должно попадать в вывод ни при каких условиях.
  * `vlessUuid`, `trojanPassword`, `ssPassword` — учётные данные подключения человека из объекта
  * пользователя: точное `password` их не ловит, и `users_get*` отдавал их открытым текстом (25.09.2026).
+ * С 3.4 совпадение по ОКОНЧАНИЮ имени, а не по имени целиком: в конфигах интеграций нод и в
+ * настройках OAuth2 ключи называются как угодно (`clientSecret`, `botToken`, `cloudApiKey`).
  */
-const SECRET_KEYS = /^(privateKey|private_key|password|secret|secretKey|apiKey|api_key|token|accessToken|refreshToken|vlessUuid|trojanPassword|ssPassword)$/i;
+const SECRET_KEYS = /(privateKey|private_key|password|secret|secretKey|apiKey|api_key|token|accessToken|refreshToken|vlessUuid|trojanPassword|ssPassword)$/i;
 
 /**
  * Инструменты, чей СМЫСЛ — выдать секрет. Для них вычистка отключена: иначе генератор ключей
@@ -49,6 +51,7 @@ const READ_ONLY = [
     /^auth_status$/, /^inbounds_list$/, /_usage$/, /_top_users$/,
     /^subscription_info$/, /^subscriptions_get_.+$/, /_resolve$/,
     /_accessible_nodes$/, /_metadata$/, /_history_list$/, /_reports$/,
+    /^bandwidth_/, /_request_history$/, /_list_all$/,
 ];
 
 function isReadOnly(name: string): boolean {
@@ -58,13 +61,21 @@ function isReadOnly(name: string): boolean {
     return READ_ONLY.some((re) => re.test(name));
 }
 
+const REDACTED = '«вычищено сервером MCP»';
+
+/** `socks5://user:pass@host:port` — пароль внутри URL ключом не назовёшь (`proxyUrl` нод). */
+const URL_CREDENTIALS = /^([a-z][a-z0-9+.-]*:\/\/[^:@/\s]+:)[^@/\s]+@/i;
+
 function redact(value: unknown): unknown {
+    if (typeof value === 'string' && URL_CREDENTIALS.test(value)) {
+        return value.replace(URL_CREDENTIALS, `$1${REDACTED}@`);
+    }
     if (Array.isArray(value)) return value.map(redact);
     if (value && typeof value === 'object') {
         const out: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
             out[k] = SECRET_KEYS.test(k) && typeof v === 'string' && v.length > 0
-                ? '«вычищено сервером MCP»'
+                ? REDACTED
                 : redact(v);
         }
         return out;
@@ -108,11 +119,45 @@ function isAnnotations(value: unknown): boolean {
     return keys.length > 0 && keys.every((k) => ANNOTATION_KEYS.has(k));
 }
 
+/** Путь к первой строке с заглушкой вычистки во входе инструмента, или null. */
+function findRedacted(value: unknown, path: string): string | null {
+    if (typeof value === 'string') return value.includes(REDACTED) ? path : null;
+    if (value && typeof value === 'object') {
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+            const hit = findRedacted(v, Array.isArray(value) ? `${path}[${k}]` : `${path}.${k}`);
+            if (hit) return hit;
+        }
+    }
+    return null;
+}
+
+/**
+ * 🔴 Заглушку вычистки нельзя записать в панель ни одним инструментом. Модель видит секреты
+ * только заглушкой и правит «прочитал → поменял → залил»: так `clientSecret` OAuth2 или ключ
+ * в конфиге интеграции нод заменились бы строкой «вычищено» — вход и интеграция ломаются
+ * молча. Раньше отказ стоял в одном `config_profiles_update`; с суффиксной вычисткой (3.4)
+ * заглушка доезжает до многих тулов, поэтому отказ — здесь, для всех мутирующих сразу.
+ */
 function wrapCallback(name: string, cb: unknown): unknown {
     if (typeof cb !== 'function') return cb;
     const fn = cb as (...a: unknown[]) => unknown;
-    if (SECRET_PRODUCERS.has(name)) return fn;
-    return async (...args: unknown[]) => redactResult(await fn(...args));
+    const guard = !isReadOnly(name);
+    const run = async (...args: unknown[]) => {
+        const hit = guard ? findRedacted(args[0], 'arguments') : null;
+        if (hit) {
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: `Error: отказ: в ${hit} лежит заглушка вычистки секрета вместо настоящего значения. ` +
+                        'Не передавай поле с секретом вовсе (или передай настоящее значение) — иначе панель сохранит заглушку.',
+                }],
+                isError: true,
+            };
+        }
+        return fn(...args);
+    };
+    if (SECRET_PRODUCERS.has(name)) return run;
+    return async (...args: unknown[]) => redactResult(await run(...args));
 }
 
 /**

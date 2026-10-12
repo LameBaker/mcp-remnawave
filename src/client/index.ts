@@ -382,6 +382,10 @@ export class RemnawaveClient {
         return this.patch(REST_API.HOSTS.BULK.UPDATE, params);
     }
 
+    async bulkUpdateHosts(params: Record<string, unknown>) {
+        return this.patch(REST_API.HOSTS.BULK.UPDATE, params);
+    }
+
     // System
 
     // `tz` определяет, по какой зоне нарезаны сутки в ответе; без него — по UTC.
@@ -955,4 +959,190 @@ export class RemnawaveClient {
     async updateSubscriptionTemplate(params: Record<string, unknown>) {
         return this.patch(REST_API.SUBSCRIPTION_TEMPLATE.UPDATE, params);
     }
+
+    async createSubscriptionTemplate(params: Record<string, unknown>) {
+        return this.post(REST_API.SUBSCRIPTION_TEMPLATE.CREATE, params);
+    }
+
+    async deleteSubscriptionTemplate(uuid: string) {
+        return this.delete(REST_API.SUBSCRIPTION_TEMPLATE.DELETE(uuid));
+    }
+
+    async reorderSubscriptionTemplates(params: Record<string, unknown>) {
+        return this.post(REST_API.SUBSCRIPTION_TEMPLATE.ACTIONS.REORDER, params);
+    }
+
+    // Теги сущностей (3.4). У каждого раздела GET — все теги раздела, PATCH — ЗАМЕНА тегов одной
+    // сущности целиком: {uuid, tags}. Методы выписаны поштучно, а не через таблицу маршрутов:
+    // check:contract видит только вызовы вида this.<verb>(REST_API.…).
+
+    async getConfigProfileTags() {
+        return this.get(REST_API.CONFIG_PROFILES.TAGS.GET);
+    }
+
+    async setConfigProfileTags(params: Record<string, unknown>) {
+        return this.patch(REST_API.CONFIG_PROFILES.TAGS.SET, params);
+    }
+
+    async getInternalSquadTags() {
+        return this.get(REST_API.INTERNAL_SQUADS.TAGS.GET);
+    }
+
+    async setInternalSquadTags(params: Record<string, unknown>) {
+        return this.patch(REST_API.INTERNAL_SQUADS.TAGS.SET, params);
+    }
+
+    async getExternalSquadTags() {
+        return this.get(REST_API.EXTERNAL_SQUADS.TAGS.GET);
+    }
+
+    async setExternalSquadTags(params: Record<string, unknown>) {
+        return this.patch(REST_API.EXTERNAL_SQUADS.TAGS.SET, params);
+    }
+
+    async getNodePluginTags() {
+        return this.get(REST_API.NODE_PLUGINS.TAGS.GET);
+    }
+
+    async setNodePluginTags(params: Record<string, unknown>) {
+        return this.patch(REST_API.NODE_PLUGINS.TAGS.SET, params);
+    }
+
+    async getSubscriptionPageConfigTags() {
+        return this.get(REST_API.SUBSCRIPTION_PAGE_CONFIGS.TAGS.GET);
+    }
+
+    async setSubscriptionPageConfigTags(params: Record<string, unknown>) {
+        return this.patch(REST_API.SUBSCRIPTION_PAGE_CONFIGS.TAGS.SET, params);
+    }
+
+    async getSubscriptionTemplateTags() {
+        return this.get(REST_API.SUBSCRIPTION_TEMPLATE.TAGS.GET);
+    }
+
+    async setSubscriptionTemplateTags(params: Record<string, unknown>) {
+        return this.patch(REST_API.SUBSCRIPTION_TEMPLATE.TAGS.SET, params);
+    }
+
+    // Node Integrations (3.4)
+
+    async getNodeIntegrations() {
+        return this.get(REST_API.NODE_INTEGRATIONS.GET_ALL);
+    }
+
+    async getNodeIntegration(uuid: string) {
+        return this.get(REST_API.NODE_INTEGRATIONS.GET(uuid));
+    }
+
+    async createNodeIntegration(params: Record<string, unknown>) {
+        return this.post(REST_API.NODE_INTEGRATIONS.CREATE, params);
+    }
+
+    async updateNodeIntegration(params: Record<string, unknown>) {
+        return this.patch(REST_API.NODE_INTEGRATIONS.UPDATE, params);
+    }
+
+    async deleteNodeIntegration(uuid: string) {
+        return this.delete(REST_API.NODE_INTEGRATIONS.DELETE(uuid));
+    }
+
+    // Shared lists (3.3+). Адресуются по ИМЕНИ, а не по uuid; все пять команд, кроме sync и
+    // by-name, висят на одном пути и различаются только методом — как у сниппетов.
+
+    async getSharedLists() {
+        return this.get(REST_API.NODE_PLUGINS.SHARED_LISTS.GET_ALL);
+    }
+
+    async getSharedList(name: string) {
+        return this.get(`${REST_API.NODE_PLUGINS.SHARED_LISTS.GET}${this.buildQuery({ name })}`);
+    }
+
+    async createSharedList(params: Record<string, unknown>) {
+        return this.post(REST_API.NODE_PLUGINS.SHARED_LISTS.CREATE, params);
+    }
+
+    async updateSharedList(params: Record<string, unknown>) {
+        return this.patch(REST_API.NODE_PLUGINS.SHARED_LISTS.UPDATE, params);
+    }
+
+    async deleteSharedList(params: Record<string, unknown>) {
+        return this.delete(REST_API.NODE_PLUGINS.SHARED_LISTS.DELETE, params);
+    }
+
+    async syncSharedList(params: Record<string, unknown>) {
+        return this.post(REST_API.NODE_PLUGINS.SHARED_LISTS.ACTIONS.SYNC, params);
+    }
+
+    async syncNodePlugin(params: Record<string, unknown>) {
+        return this.post(REST_API.NODE_PLUGINS.ACTIONS.SYNC, params);
+    }
+
+    async syncSnippet(params: Record<string, unknown>) {
+        return this.post(REST_API.SNIPPETS.ACTIONS.SYNC, params);
+    }
+
+    // Geocheck (3.3+): как и выборка подключений — асинхронная задача: POST отдаёт jobId,
+    // результат забирается отдельным GET по нему.
+
+    async startGeocheck(nodeUuid: string, params: Record<string, unknown>) {
+        return this.post(REST_API.CONNECTIONS.GEOCHECK_BY_NODE(nodeUuid), params);
+    }
+
+    async getGeocheckResult(jobId: string) {
+        return this.get(REST_API.CONNECTIONS.GEOCHECK_BY_NODE_RESULT(jobId));
+    }
+
+    // Hosts / squads — недостающие действия
+
+    async cloneHost(params: Record<string, unknown>) {
+        return this.post(REST_API.HOSTS.ACTIONS.CLONE, params);
+    }
+
+    async reorderHosts(params: Record<string, unknown>) {
+        return this.post(REST_API.HOSTS.ACTIONS.REORDER, params);
+    }
+
+    async getInternalSquadByUuid(uuid: string) {
+        return this.get(REST_API.INTERNAL_SQUADS.GET_BY_UUID(uuid));
+    }
+
+    async reorderInternalSquads(params: Record<string, unknown>) {
+        return this.post(REST_API.INTERNAL_SQUADS.ACTIONS.REORDER, params);
+    }
+
+    // Users / system / tokens — недостающие чтения и действия
+
+    async extendUserExpiration(userId: string, days: number) {
+        return this.post(REST_API.USERS.ACTIONS.EXTEND_EXPIRATION_DATE(userId), { days });
+    }
+
+    async getSystemConfiguration() {
+        return this.get(REST_API.SYSTEM.CONFIGURATION);
+    }
+
+    // start/end — ISO 8601 с зоной, обязательны; end не включается.
+    async getStatsDigest(params: Record<string, unknown>) {
+        return this.get(`${REST_API.SYSTEM.STATS.DIGEST}${this.buildQuery(params)}`);
+    }
+
+    async getApiTokenScopes() {
+        return this.get(REST_API.API_TOKENS.GET_SCOPES);
+    }
+
+    // POST-двойники bandwidth-stats: то же, что GET по нодам, но с выборкой по списку
+    // `nodesUuids` в теле; `start`/`end` (YYYY-MM-DD) — в query, обязательны.
+    async getNodesUsageByUsers(query: Record<string, unknown>, nodesUuids: string[]) {
+        return this.post(
+            `${REST_API.BANDWIDTH_STATS.NODES.GET_USAGE}${this.buildQuery(query)}`,
+            { nodesUuids },
+        );
+    }
+
+    async getNodesTopUsers(query: Record<string, unknown>, nodesUuids: string[]) {
+        return this.post(
+            `${REST_API.BANDWIDTH_STATS.NODES.GET_USERS_BY_NODES}${this.buildQuery(query)}`,
+            { nodesUuids },
+        );
+    }
 }
+

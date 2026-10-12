@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RemnawaveClient } from '../client/index.js';
-import { toolResult, toolError, listQueryParams } from './helpers.js';
+import { toolResult, toolError, listQueryParams, tagList } from './helpers.js';
 
 export function registerNodePluginTools(server: McpServer, client: RemnawaveClient, readonly: boolean) {
     server.tool('node_plugins_list', 'List all node plugins', {}, async () => {
@@ -22,6 +22,22 @@ export function registerNodePluginTools(server: McpServer, client: RemnawaveClie
 
     server.tool('node_plugins_torrent_stats', 'Get torrent blocker statistics', {}, async () => {
         try { return toolResult(await client.getTorrentBlockerStats()); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('node_plugins_tags_list', 'List all tags used by node plugins', {}, async () => {
+        try { return toolResult(await client.getNodePluginTags()); } catch (e) { return toolError(e); }
+    });
+
+    // Shared lists (3.3+) — именованные списки (IP, домены…), на которые ссылаются конфиги
+    // плагинов. Адресуются по имени.
+    server.tool('shared_lists_list', 'List node-plugin shared lists (name, type, item count)', {}, async () => {
+        try { return toolResult(await client.getSharedLists()); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('shared_lists_get', 'Get one shared list with its config, by name', {
+        name: z.string().min(2).max(255).describe('Shared list name'),
+    }, async ({ name }) => {
+        try { return toolResult(await client.getSharedList(name)); } catch (e) { return toolError(e); }
     });
 
     if (readonly) return;
@@ -113,5 +129,45 @@ export function registerNodePluginTools(server: McpServer, client: RemnawaveClie
 
     server.tool('node_plugins_torrent_truncate', 'Truncate all torrent blocker reports', {}, async () => {
         try { return toolResult(await client.truncateTorrentBlockerReports()); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('node_plugins_set_tags', 'Set tags of one node plugin — REPLACES its whole tag set', {
+        uuid: z.string().uuid().describe('UUID'),
+        tags: tagList.describe('Tags, up to 10: A-Z, 0-9, _ and : only, each up to 36 chars; [] clears'),
+    }, async (params) => {
+        try { return toolResult(await client.setNodePluginTags(params)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('node_plugins_sync', 'Push a node plugin config to the nodes that use it now', {
+        uuid: z.string().uuid().describe('Plugin UUID'),
+    }, async (params) => {
+        try { return toolResult(await client.syncNodePlugin(params)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('shared_lists_create', 'Create a shared list', {
+        name: z.string().min(2).max(255).describe('Shared list name'),
+        config: z.record(z.string(), z.unknown()).describe('List config object (type and items)'),
+    }, async (params) => {
+        try { return toolResult(await client.createSharedList(params)); } catch (e) { return toolError(e); }
+    });
+
+    // Контракт требует config целиком: правка списка — это его полная замена.
+    server.tool('shared_lists_update', 'Replace a shared list config (the whole config, not a patch)', {
+        name: z.string().min(2).max(255).describe('Shared list name'),
+        config: z.record(z.string(), z.unknown()).describe('New full list config object'),
+    }, async (params) => {
+        try { return toolResult(await client.updateSharedList(params)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('shared_lists_delete', 'Delete a shared list by name', {
+        name: z.string().min(2).max(255).describe('Shared list name'),
+    }, async (params) => {
+        try { return toolResult(await client.deleteSharedList(params)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('shared_lists_sync', 'Push a shared list to the nodes that use it now', {
+        name: z.string().min(2).max(255).describe('Shared list name'),
+    }, async (params) => {
+        try { return toolResult(await client.syncSharedList(params)); } catch (e) { return toolError(e); }
     });
 }

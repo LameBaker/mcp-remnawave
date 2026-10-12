@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RemnawaveClient } from '../client/index.js';
-import { toolResult, toolError, listQueryParams } from './helpers.js';
+import { toolResult, toolError, listQueryParams, userTag, uuidList } from './helpers.js';
 
 export function registerUserTools(server: McpServer, client: RemnawaveClient, readonly: boolean) {
     server.tool(
@@ -162,9 +162,9 @@ export function registerUserTools(server: McpServer, client: RemnawaveClient, re
 
     server.tool(
         'users_resolve',
-        'Search and resolve users by UUID, ID, short UUID, or username',
+        'Resolve a user to {id, username, shortUuid} by exactly one of: numeric ID, short UUID, username',
         {
-            uuid: z.string().optional().describe('User UUID'),
+            // В 3.x поиска по uuid нет — поле `uuid` панель отбрасывала, а требует РОВНО ОДИН ключ.
             id: z.number().optional().describe('User numeric ID'),
             shortUuid: z.string().optional().describe('Short UUID'),
             username: z.string().optional().describe('Username'),
@@ -200,19 +200,26 @@ export function registerUserTools(server: McpServer, client: RemnawaveClient, re
                 .optional()
                 .describe('Initial user status'),
             description: z.string().optional().describe('User description'),
-            tag: z.string().optional().describe('User tag for grouping'),
-            telegramId: z.number().optional().describe('Telegram user ID'),
-            email: z.string().optional().describe('User email'),
+            tag: userTag.nullish().describe('User tag for grouping: up to 16 chars, A-Z 0-9 _'),
+            telegramId: z.number().nullish().describe('Telegram user ID'),
+            email: z.string().email().nullish().describe('User email'),
             hwidDeviceLimit: z
                 .number()
                 .optional()
                 .describe('Max number of HWID devices'),
-            activeInternalSquads: z
-                .array(z.string())
+            activeInternalSquads: uuidList
                 .optional()
                 .describe('Array of internal squad UUIDs'),
-            uuid: z.string().optional().describe('Custom UUID for the user'),
-            externalSquadUuid: z.string().optional().describe('External squad UUID'),
+            externalSquadUuid: z.string().uuid().nullish().describe('External squad UUID'),
+            // Учётные данные и даты задаются явно только при переносе людей из другой панели:
+            // иначе подписка у них сменится. В 3.x своего `uuid` у пользователя нет — прежнее
+            // поле `uuid` панель молча отбрасывала.
+            shortUuid: z.string().optional().describe('Subscription short UUID — only when migrating a user, otherwise generated'),
+            vlessUuid: z.string().uuid().optional().describe('VLESS credential — only when migrating, otherwise generated'),
+            trojanPassword: z.string().min(8).max(32).optional().describe('Trojan password — only when migrating, otherwise generated'),
+            ssPassword: z.string().min(8).max(32).optional().describe('Shadowsocks password — only when migrating, otherwise generated'),
+            createdAt: z.string().optional().describe('Original creation date (ISO 8601) — only when migrating'),
+            lastTrafficResetAt: z.string().optional().describe('Last traffic reset date (ISO 8601) — only when migrating'),
         },
         async (params) => {
             try {
@@ -246,19 +253,19 @@ export function registerUserTools(server: McpServer, client: RemnawaveClient, re
                 .enum(['ACTIVE', 'DISABLED'])
                 .optional()
                 .describe('User status'),
-            description: z.string().optional().describe('User description'),
-            tag: z.string().optional().describe('User tag'),
-            telegramId: z.number().optional().describe('Telegram user ID'),
-            email: z.string().optional().describe('User email'),
+            description: z.string().nullish().describe('User description, null to clear'),
+            tag: userTag.nullish().describe('User tag: up to 16 chars, A-Z 0-9 _; null to clear'),
+            telegramId: z.number().nullish().describe('Telegram user ID, null to clear'),
+            email: z.string().email().nullish().describe('User email, null to clear'),
             hwidDeviceLimit: z
                 .number()
-                .optional()
-                .describe('Max HWID devices'),
-            activeInternalSquads: z
-                .array(z.string())
+                .int()
+                .nullish()
+                .describe('Max HWID devices, null to fall back to the panel default'),
+            activeInternalSquads: uuidList
                 .optional()
                 .describe('Internal squad UUIDs'),
-            externalSquadUuid: z.string().optional().describe('External squad UUID'),
+            externalSquadUuid: z.string().uuid().nullish().describe('External squad UUID, null to detach'),
         },
         async (params) => {
             try {
@@ -375,12 +382,12 @@ export function registerUserTools(server: McpServer, client: RemnawaveClient, re
             expireAt: z.string().optional().describe('New expiration date (ISO 8601)'),
             trafficLimitBytes: z.number().optional().describe('New traffic limit'),
             trafficLimitStrategy: z.enum(['NO_RESET', 'DAY', 'WEEK', 'MONTH', 'MONTH_ROLLING']).optional().describe('Traffic reset period'),
-            description: z.string().optional().describe('User description'),
-            telegramId: z.number().optional().describe('Telegram user ID'),
-            email: z.string().optional().describe('User email'),
-            tag: z.string().optional().describe('User tag'),
-            hwidDeviceLimit: z.number().optional().describe('Max HWID devices'),
-            externalSquadUuid: z.string().optional().describe('External squad UUID'),
+            description: z.string().nullish().describe('User description, null to clear'),
+            telegramId: z.number().nullish().describe('Telegram user ID, null to clear'),
+            email: z.string().email().nullish().describe('User email, null to clear'),
+            tag: userTag.nullish().describe('User tag: up to 16 chars, A-Z 0-9 _; null to clear'),
+            hwidDeviceLimit: z.number().int().nullish().describe('Max HWID devices, null to fall back to the panel default'),
+            externalSquadUuid: z.string().uuid().nullish().describe('External squad UUID, null to detach'),
         },
         async (params) => {
             try {
@@ -483,11 +490,11 @@ export function registerUserTools(server: McpServer, client: RemnawaveClient, re
             expireAt: z.string().optional().describe('New expiration date for all'),
             trafficLimitBytes: z.number().optional().describe('Traffic limit in bytes'),
             trafficLimitStrategy: z.enum(['NO_RESET', 'DAY', 'WEEK', 'MONTH', 'MONTH_ROLLING']).optional().describe('Traffic reset period'),
-            description: z.string().optional().describe('User description'),
-            telegramId: z.number().optional().describe('Telegram user ID'),
-            email: z.string().optional().describe('User email'),
-            tag: z.string().optional().describe('User tag'),
-            hwidDeviceLimit: z.number().optional().describe('Max HWID devices'),
+            description: z.string().nullish().describe('User description, null to clear'),
+            telegramId: z.number().nullish().describe('Telegram user ID, null to clear'),
+            email: z.string().email().nullish().describe('User email, null to clear'),
+            tag: userTag.nullish().describe('User tag: up to 16 chars, A-Z 0-9 _; null to clear'),
+            hwidDeviceLimit: z.number().int().nullish().describe('Max HWID devices, null to fall back to the panel default'),
         },
         async (params) => {
             try {
@@ -522,6 +529,24 @@ export function registerUserTools(server: McpServer, client: RemnawaveClient, re
         async (params) => {
             try {
                 const result = await client.bulkAllExtendUsersExpiration(params);
+                return toolResult(result);
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    // Поштучный вариант users_bulk_extend_expiration: дни прибавляются к текущей дате окончания.
+    server.tool(
+        'users_extend',
+        'Extend one user\'s expiration date by N days',
+        {
+            userId: z.string().regex(/^\d+$/).describe('Numeric user ID (API 3.x has no user uuid)'),
+            days: z.number().int().min(1).describe('Days to add to the current expiration date'),
+        },
+        async ({ userId, days }) => {
+            try {
+                const result = await client.extendUserExpiration(userId, days);
                 return toolResult(result);
             } catch (e) {
                 return toolError(e);

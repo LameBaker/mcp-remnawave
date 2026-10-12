@@ -329,6 +329,38 @@ for (const call of calls) {
     }
 }
 
+// Команды контракта, которых клиент не вызывает вовсе: новые эндпоинты панели приходят с
+// обновлением пакета молча, и без этого отчёта узнать о них можно только чтением changelog.
+const calledKeys = new Set(calls.map((call) => call.key));
+/**
+ * Не покрыты осознанно — команды, которые MCP с API-токеном вызывать незачем или нельзя.
+ * Новая команда вне этого списка появится в отчёте сама.
+ */
+const INTENTIONALLY_UNCOVERED: Record<string, string> = {
+    // вход администратора в веб-панель: сессия браузера, а не API-токен
+    LoginCommand: 'вход в веб-панель',
+    RegisterCommand: 'регистрация первого администратора',
+    OAuth2AuthorizeCommand: 'вход в веб-панель через OAuth2',
+    OAuth2CallbackCommand: 'вход в веб-панель через OAuth2',
+    GetPasskeyAuthenticationOptionsCommand: 'вход по passkey — WebAuthn в браузере',
+    VerifyPasskeyAuthenticationCommand: 'вход по passkey — WebAuthn в браузере',
+    GetPasskeyRegistrationOptionsCommand: 'регистрация passkey — WebAuthn в браузере',
+    VerifyPasskeyRegistrationCommand: 'регистрация passkey — WebAuthn в браузере',
+    GetPasskeysCommand: 'passkey администратора — только из его сессии',
+    UpdatePasskeyCommand: 'passkey администратора — только из его сессии',
+    DeletePasskeyCommand: 'passkey администратора — только из его сессии',
+    GetOttCommand: 'одноразовый токен для веб-сессии',
+    // веб-терминал ноды: тикет и OPRF-хранилище работают поверх WebSocket из браузера,
+    // а сам тикет — действующий доступ к shell ноды, которому нечего делать в расшифровке
+    CreateSshTicketCommand: 'веб-терминал ноды (WebSocket), тикет — доступ к shell',
+    EvaluateVaultCommand: 'веб-терминал ноды: шаг шифрования хранилища ключей в браузере',
+};
+const uncovered = [...commands.values()]
+    .flat()
+    .filter((command) => !calledKeys.has(command.key) && !(command.name in INTENTIONALLY_UNCOVERED))
+    .map((command) => `  ${command.key}  (${command.name})`)
+    .sort();
+
 if (unknownRoute.length) {
     console.log(`Путей вне контракта: ${unknownRoute.length}`);
     for (const line of unknownRoute) console.log(line);
@@ -366,6 +398,7 @@ interface ToolGap {
 
 const gaps: ToolGap[] = [];
 const queryGaps: ToolGap[] = [];
+const reshapedGaps: ToolGap[] = [];
 const emptySchemas: string[] = [];
 let toolsChecked = 0;
 let queryToolsChecked = 0;
@@ -483,6 +516,18 @@ for (const file of readdirSync(TOOLS_DIR).filter((name) => name.endsWith('.ts'))
         const clientCall = passesThrough ? handlerPart.match(/client\.(\w+)\(\s*params\s*\)/) : null;
         if (!clientCall) {
             reshapedBodies++;
+            // Тело собирается вручную — имена полей тула вправе не совпадать с контрактом, поэтому
+            // сверка только по запросу (`CONTRACT_VERBOSE=1`) и только глазами.
+            const reshapedCommand = anyClientCall ? methodToCommand.get(anyClientCall[1]) : undefined;
+            if (process.env.CONTRACT_VERBOSE && !reshapedCommand) {
+                console.log(`  ? ${nameLiteral[1]} → ${anyClientCall?.[1] ?? '—'}: команда не сопоставлена`);
+            }
+            if (process.env.CONTRACT_VERBOSE && reshapedCommand) {
+                const missing = reshapedCommand.bodyFields.filter((field) => !schemaKeys.has(field));
+                if (missing.length) {
+                    reshapedGaps.push({ tool: nameLiteral[1], command: reshapedCommand.name, missing, file });
+                }
+            }
             continue;
         }
         const command = methodToCommand.get(clientCall[1]);
@@ -494,6 +539,17 @@ for (const file of readdirSync(TOOLS_DIR).filter((name) => name.endsWith('.ts'))
             gaps.push({ tool: nameLiteral[1], command: command.name, missing, file });
         }
     }
+}
+
+if (uncovered.length) {
+    console.log(`КОМАНДЫ КОНТРАКТА БЕЗ ВЫЗОВА В КЛИЕНТЕ (${uncovered.length}):`);
+    for (const line of uncovered) console.log(line);
+    console.log();
+} else {
+    console.log(
+        `Клиент вызывает все команды контракта, кроме ${Object.keys(INTENTIONALLY_UNCOVERED).length} ` +
+            'осознанно непокрытых (INTENTIONALLY_UNCOVERED).\n',
+    );
 }
 
 console.log(
@@ -523,6 +579,15 @@ if (gaps.length) {
     console.log('\nЭто отчёт, а не провал: часть полей может быть не нужна осознанно.');
 } else {
     console.log('Схемы тулов покрывают все поля тела из контракта.');
+}
+if (reshapedGaps.length) {
+    console.log(`\nТЕЛО СОБИРАЕТСЯ ВРУЧНУЮ — ПОЛЯ КОНТРАКТА, КОТОРЫХ НЕТ В СХЕМЕ (${reshapedGaps.length}, сверить глазами):`);
+    for (const gap of reshapedGaps.sort((a, b) => a.tool.localeCompare(b.tool))) {
+        console.log(
+            `  ${gap.tool} (${gap.command}, tools/${gap.file}) — нет: ` +
+                gap.missing.map((field) => `\`${field}\``).join(', '),
+        );
+    }
 }
 console.log();
 

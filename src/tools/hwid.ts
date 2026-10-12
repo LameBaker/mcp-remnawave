@@ -86,6 +86,7 @@ export function registerHwidTools(
             osVersion: z.string().optional().describe('OS version'),
             deviceModel: z.string().optional().describe('Device model'),
             userAgent: z.string().optional().describe('User agent string'),
+            requestIp: z.string().optional().describe('IP the device was seen from'),
         },
         async (params) => {
             try {

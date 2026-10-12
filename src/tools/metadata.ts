@@ -18,17 +18,19 @@ export function registerMetadataTools(server: McpServer, client: RemnawaveClient
 
     if (readonly) return;
 
+    // Тело — `{ metadata: {...} }`, а не сама карта: прежний вызов слал карту голой, и панель
+    // отвечала «metadata: expected object» (найдено check:requests).
     server.tool('metadata_node_upsert', 'Create or update metadata for a node', {
         uuid: z.string().uuid().describe('Node UUID'),
         metadata: z.record(z.string(), z.unknown()).describe('Metadata key-value pairs'),
     }, async ({ uuid, metadata }) => {
-        try { return toolResult(await client.upsertNodeMetadata(uuid, metadata)); } catch (e) { return toolError(e); }
+        try { return toolResult(await client.upsertNodeMetadata(uuid, { metadata })); } catch (e) { return toolError(e); }
     });
 
     server.tool('metadata_user_upsert', 'Create or update metadata for a user', {
         userId: z.string().describe('Numeric user ID (API 3.x has no user uuid)'),
         metadata: z.record(z.string(), z.unknown()).describe('Metadata key-value pairs'),
     }, async ({ userId, metadata }) => {
-        try { return toolResult(await client.upsertUserMetadata(userId, metadata)); } catch (e) { return toolError(e); }
+        try { return toolResult(await client.upsertUserMetadata(userId, { metadata })); } catch (e) { return toolError(e); }
     });
 }

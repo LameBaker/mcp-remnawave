@@ -1,7 +1,30 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RemnawaveClient } from '../client/index.js';
-import { toolResult, toolError } from './helpers.js';
+import { toolResult, toolError, tagList, uuidList } from './helpers.js';
+
+/** IP ноды с ролью (3.4). Список передаётся целиком и заменяет прежний. */
+const nodeIps = z
+    .array(
+        z.object({
+            ip: z.union([z.ipv4(), z.ipv6()]).describe('IPv4 or IPv6 address'),
+            status: z
+                .enum([
+                    'INBOUND',
+                    'OUTBOUND',
+                    'MANAGEMENT',
+                    'TRANSIT',
+                    'MONITORING',
+                    'RESERVE',
+                    'BLOCKED',
+                    'FLAGGED',
+                    'DEPRECATED',
+                    'UNKNOWN',
+                ])
+                .describe('Role of this IP on the node'),
+        }),
+    )
+    .max(64);
 
 export function registerNodeTools(server: McpServer, client: RemnawaveClient, readonly: boolean) {
     server.tool(
@@ -83,36 +106,34 @@ export function registerNodeTools(server: McpServer, client: RemnawaveClient, re
                 .describe('Traffic consumption multiplier'),
             activeConfigProfileUuid: z
                 .string()
+                .uuid()
                 .describe('Config profile UUID to assign'),
-            activeInbounds: z
-                .array(z.string())
+            activeInbounds: uuidList
                 .describe('Array of inbound UUIDs to enable'),
+            nodeConsumptionMultiplier: z
+                .number()
+                .optional()
+                .describe('Per-node consumption multiplier (0-100, one decimal)'),
+            proxyUrl: z
+                .string()
+                .regex(/^socks5:\/\/(?:[^:@/\s]+(?::[^@/\s]*)?@)?[^:@/\s]+:\d{1,5}$/, 'socks5://[user:pass@]host:port')
+                .nullish()
+                .describe('Outbound SOCKS5 proxy: socks5://[user:pass@]host:port'),
+            providerUuid: z.string().uuid().nullish().describe('Infra billing provider UUID'),
+            activePluginUuid: z.string().uuid().nullish().describe('Node plugin UUID to activate'),
+            tags: tagList.optional().describe('Node tags: UPPERCASE, digits, _ and : only, up to 10 tags'),
+            note: z.string().max(255).optional().describe('Free-form note, up to 255 chars'),
+            integrationUuids: uuidList.max(20).optional().describe('Node integration UUIDs, up to 20'),
+            ips: nodeIps.optional().describe('Node IPs with their roles, up to 64'),
         },
-        async (params) => {
+        async ({ activeConfigProfileUuid, activeInbounds, ...rest }) => {
             try {
+                // Плоская схема удобнее вызывающему; контракт ждёт профиль вложенным объектом.
+                // Непереданные поля — undefined, JSON их отбрасывает сам.
                 const body: Record<string, unknown> = {
-                    name: params.name,
-                    address: params.address,
-                    configProfile: {
-                        activeConfigProfileUuid:
-                            params.activeConfigProfileUuid,
-                        activeInbounds: params.activeInbounds,
-                    },
+                    ...rest,
+                    configProfile: { activeConfigProfileUuid, activeInbounds },
                 };
-                if (params.port !== undefined) body.port = params.port;
-                if (params.countryCode !== undefined)
-                    body.countryCode = params.countryCode;
-                if (params.isTrafficTrackingActive !== undefined)
-                    body.isTrafficTrackingActive =
-                        params.isTrafficTrackingActive;
-                if (params.trafficLimitBytes !== undefined)
-                    body.trafficLimitBytes = params.trafficLimitBytes;
-                if (params.trafficResetDay !== undefined)
-                    body.trafficResetDay = params.trafficResetDay;
-                if (params.notifyPercent !== undefined)
-                    body.notifyPercent = params.notifyPercent;
-                if (params.consumptionMultiplier !== undefined)
-                    body.consumptionMultiplier = params.consumptionMultiplier;
 
                 const result = await client.createNode(body);
                 return toolResult(result);
@@ -164,14 +185,14 @@ export function registerNodeTools(server: McpServer, client: RemnawaveClient, re
                     activeConfigProfileUuid: z
                         .string()
                         .describe('Config profile UUID to activate on this node'),
-                    activeInbounds: z
-                        .array(z.string())
+                    activeInbounds: uuidList
                         .describe('Inbound UUIDs from that profile to enable'),
                 })
                 .optional()
                 .describe('Switch the node to another config profile (both fields required)'),
             proxyUrl: z
                 .string()
+                .regex(/^socks5:\/\/(?:[^:@/\s]+(?::[^@/\s]*)?@)?[^:@/\s]+:\d{1,5}$/, 'socks5://[user:pass@]host:port')
                 .nullish()
                 .describe('Outbound SOCKS5 proxy: socks5://[user:pass@]host:port, null to clear'),
             providerUuid: z
@@ -182,42 +203,20 @@ export function registerNodeTools(server: McpServer, client: RemnawaveClient, re
                 .string()
                 .nullish()
                 .describe('Node plugin UUID to activate, null to detach'),
-            tags: z
-                .array(z.string())
+            tags: tagList
                 .optional()
                 .describe('Node tags: UPPERCASE, digits, _ and : only, up to 10 tags'),
             note: z
                 .string()
                 .nullish()
                 .describe('Free-form note, up to 255 chars, null to clear'),
-            integrationUuids: z
-                .array(z.string().uuid())
+            integrationUuids: uuidList
                 .max(20)
                 .optional()
                 .describe('Node integration UUIDs, up to 20'),
-            ips: z
-                .array(
-                    z.object({
-                        ip: z.union([z.ipv4(), z.ipv6()]).describe('IPv4 or IPv6 address'),
-                        status: z
-                            .enum([
-                                'INBOUND',
-                                'OUTBOUND',
-                                'MANAGEMENT',
-                                'TRANSIT',
-                                'MONITORING',
-                                'RESERVE',
-                                'BLOCKED',
-                                'FLAGGED',
-                                'DEPRECATED',
-                                'UNKNOWN',
-                            ])
-                            .describe('Role of this IP on the node'),
-                    }),
-                )
-                .max(64)
+            ips: nodeIps
                 .optional()
-                .describe('Full list of node IPs with their roles, up to 64'),
+                .describe('Full list of node IPs with their roles, up to 64 — REPLACES the current list'),
         },
         async (params) => {
             try {
@@ -410,9 +409,12 @@ export function registerNodeTools(server: McpServer, client: RemnawaveClient, re
             uuids: z.array(z.string().uuid()).describe('Array of node UUIDs'),
             countryCode: z.string().optional().describe('New country code'),
             consumptionMultiplier: z.number().optional().describe('New consumption multiplier'),
-            providerUuid: z.string().optional().describe('Infra provider UUID'),
-            tags: z.array(z.string()).optional().describe('Node tags'),
-            activePluginUuid: z.string().optional().describe('Active plugin UUID'),
+            nodeConsumptionMultiplier: z.number().optional().describe('Per-node consumption multiplier (0-100, one decimal)'),
+            providerUuid: z.string().uuid().nullish().describe('Infra provider UUID, null to detach'),
+            tags: tagList.optional().describe('Node tags: UPPERCASE, digits, _ and : only — REPLACES the set'),
+            activePluginUuid: z.string().uuid().nullish().describe('Active plugin UUID, null to detach'),
+            integrationUuids: uuidList.max(20).optional().describe('Node integration UUIDs, up to 20 — REPLACES the set'),
+            note: z.string().max(255).nullish().describe('Free-form note, null to clear'),
         },
         async (params) => {
             try {

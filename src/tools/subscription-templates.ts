@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RemnawaveClient } from '../client/index.js';
-import { toolResult, toolError } from './helpers.js';
+import { toolResult, toolError, tagList } from './helpers.js';
 
 const MAX_TEMPLATE_BYTES = 5 * 1024 * 1024;
 
@@ -14,6 +14,7 @@ interface TemplateRecord {
     name: string;
     templateType: string;
     viewPosition?: number;
+    tags?: string[];
     templateJson?: unknown;
     encodedTemplateYaml?: string | null;
 }
@@ -32,6 +33,7 @@ function summarize(t: TemplateRecord) {
         name: t.name,
         templateType: t.templateType,
         viewPosition: t.viewPosition,
+        tags: t.tags,
         body: yaml
             ? { kind: 'yaml', bytes: Buffer.byteLength(yaml, 'utf8'), lines: yaml.split('\n').length }
             : t.templateJson
@@ -163,6 +165,10 @@ export function registerSubscriptionTemplateTools(
         },
     );
 
+    server.tool('subscription_templates_tags_list', 'List all tags used by subscription templates', {}, async () => {
+        try { return toolResult(await client.getSubscriptionTemplateTags()); } catch (e) { return toolError(e); }
+    });
+
     if (readonly) return;
 
     server.tool(
@@ -201,6 +207,71 @@ export function registerSubscriptionTemplateTools(
             } catch (e) {
                 return toolError(e);
             }
+        },
+    );
+
+    server.tool(
+        'subscription_templates_create',
+        'Create an empty subscription template of a given type; fill it with subscription_templates_update_from_file',
+        {
+            name: z.string().min(2).max(255).describe('Template name'),
+            templateType: z.enum(['XRAY_JSON', 'XRAY_BASE64', 'MIHOMO', 'STASH', 'CLASH', 'SINGBOX']).describe('Template type'),
+        },
+        async (params) => {
+            try {
+                return toolResult(summarize(unwrapOne(await client.createSubscriptionTemplate(params))));
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.tool(
+        'subscription_templates_delete',
+        'Delete a subscription template. Squads and hosts that reference it fall back to the default',
+        {
+            uuid: z.string().uuid().describe('Template UUID'),
+        },
+        async ({ uuid }) => {
+            try {
+                await client.deleteSubscriptionTemplate(uuid);
+                return toolResult({ success: true, message: `Template ${uuid} deleted` });
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    // Ответ на reorder — все шаблоны с телами; отдаём сводку, как и list.
+    server.tool(
+        'subscription_templates_reorder',
+        'Reorder subscription templates',
+        {
+            items: z
+                .array(z.object({
+                    viewPosition: z.number().int().describe('Sort position (0-based)'),
+                    uuid: z.string().uuid().describe('Template UUID'),
+                }))
+                .describe('Ordered array of { viewPosition, uuid } objects'),
+        },
+        async (params) => {
+            try {
+                return toolResult(unwrap(await client.reorderSubscriptionTemplates(params)).map(summarize));
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.tool(
+        'subscription_templates_set_tags',
+        'Set tags of one subscription template — REPLACES its whole tag set',
+        {
+            uuid: z.string().uuid().describe('Template UUID'),
+            tags: tagList.describe('Tags, up to 10: A-Z, 0-9, _ and : only, each up to 36 chars; [] clears'),
+        },
+        async (params) => {
+            try { return toolResult(await client.setSubscriptionTemplateTags(params)); } catch (e) { return toolError(e); }
         },
     );
 }

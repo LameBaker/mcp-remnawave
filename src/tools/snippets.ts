@@ -19,7 +19,7 @@ export function registerSnippetTools(server: McpServer, client: RemnawaveClient,
 
     server.tool('snippets_update', 'Update an existing snippet', {
         name: z.string().describe('Snippet name (identifies the snippet to update)'),
-        snippet: z.array(z.record(z.string(), z.unknown())).optional().describe('New snippet content as array of objects'),
+        snippet: z.array(z.record(z.string(), z.unknown())).describe('New snippet content as array of objects (required: the panel replaces it whole)'),
     }, async (params) => {
         try { return toolResult(await client.updateSnippet(params)); } catch (e) { return toolError(e); }
     });
@@ -28,5 +28,11 @@ export function registerSnippetTools(server: McpServer, client: RemnawaveClient,
         name: z.string().describe('Snippet name to delete'),
     }, async (params) => {
         try { return toolResult(await client.deleteSnippet(params)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('snippets_sync', 'Push a snippet to the nodes whose configs use it now', {
+        name: z.string().min(2).max(255).describe('Snippet name'),
+    }, async (params) => {
+        try { return toolResult(await client.syncSnippet(params)); } catch (e) { return toolError(e); }
     });
 }

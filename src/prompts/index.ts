@@ -99,25 +99,28 @@ export function registerAllPrompts(server: McpServer) {
         'user_audit',
         'Complete audit of a specific user',
         {
-            uuid: z.string().describe('User UUID to audit'),
+            // В 3.x у пользователя нет uuid — тулы ниже принимают числовой id.
+            userId: z.string().describe('Numeric user ID to audit'),
         },
-        async ({ uuid }) => ({
+        async ({ userId }) => ({
             messages: [
                 {
                     role: 'user' as const,
                     content: {
                         type: 'text' as const,
-                        text: `Perform a complete audit of user ${uuid}:
+                        text: `Perform a complete audit of user ${userId}:
 
 1. Get full user details using users_get
-2. Get subscription info using subscriptions_get_by_uuid
+2. Get subscription info using subscriptions_get_by_id
 3. Get HWID devices using hwid_devices_list
-4. Summarize:
+4. Check reachable nodes using users_accessible_nodes
+5. Get recent subscription fetches using users_subscription_request_history
+6. Summarize:
    - Account status and expiration
    - Traffic usage vs limit
    - Subscription URL and last access
    - Connected devices (HWID)
-   - Squad memberships
+   - Squad memberships and reachable nodes
    - Any issues or concerns`,
                     },
                 },

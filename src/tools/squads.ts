@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RemnawaveClient } from '../client/index.js';
-import { toolResult, toolError } from './helpers.js';
+import { toolResult, toolError, uuidList, tagList } from './helpers.js';
 
 export function registerSquadTools(
     server: McpServer,
@@ -38,6 +38,16 @@ export function registerSquadTools(
         },
     );
 
+    server.tool('squads_get', 'Get one internal squad by UUID: inbounds, member and inbound counts', {
+        uuid: z.string().uuid().describe('Squad UUID'),
+    }, async ({ uuid }) => {
+        try { return toolResult(await client.getInternalSquadByUuid(uuid)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('squads_tags_list', 'List all tags used by internal squads', {}, async () => {
+        try { return toolResult(await client.getInternalSquadTags()); } catch (e) { return toolError(e); }
+    });
+
     if (readonly) return;
 
     server.tool(
@@ -66,8 +76,7 @@ export function registerSquadTools(
             // ⚠️ ЗАМЕНА, НЕ ДОБАВЛЕНИЕ: переданный список полностью вытесняет прежний.
             // Пустой массив оставит сквад без инбаундов — его пользователи молча перестанут
             // получать узлы в подписке. Сперва squads_list, потом полный новый список.
-            inbounds: z
-                .array(z.string())
+            inbounds: uuidList
                 .optional()
                 .describe('Inbound UUIDs for this squad — REPLACES the current list entirely'),
         },
@@ -170,4 +179,20 @@ export function registerSquadTools(
             }
         },
     );
+
+    server.tool('squads_set_tags', 'Set tags of one internal squad — REPLACES its whole tag set', {
+        uuid: z.string().uuid().describe('Squad UUID'),
+        tags: tagList.describe('Tags, up to 10: A-Z, 0-9, _ and : only, each up to 36 chars; [] clears'),
+    }, async (params) => {
+        try { return toolResult(await client.setInternalSquadTags(params)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('squads_reorder', 'Reorder internal squads', {
+        items: z.array(z.object({
+            viewPosition: z.number().int().describe('Sort position (0-based)'),
+            uuid: z.string().uuid().describe('UUID'),
+        })).describe('Ordered array of { viewPosition, uuid } objects'),
+    }, async (params) => {
+        try { return toolResult(await client.reorderInternalSquads(params)); } catch (e) { return toolError(e); }
+    });
 }

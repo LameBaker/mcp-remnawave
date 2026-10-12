@@ -25,6 +25,7 @@ import { registerBandwidthStatsTools } from '../src/tools/bandwidth-stats.js';
 import { registerInboundTools } from '../src/tools/inbounds.js';
 import { registerAllResources } from '../src/resources/index.js';
 import { withAnnotations } from '../src/tools/annotate.js';
+import { registerNodeIntegrationTools } from '../src/tools/node-integrations.js';
 
 type Handler = (args: any) => Promise<any>;
 const handlers = new Map<string, Handler>();
@@ -445,12 +446,13 @@ check('ресурс remnawave://nodes тоже вычищается',
 check('и остальные поля ресурса на месте',
     JSON.stringify(nodesResource).includes('ru1'));
 
-// Шаблон объявляет {uuid}; прежний код читал params.userId и слал в панель undefined.
+// Имя параметра в шаблоне и в обработчике должно совпадать: при расхождении в панель уходил
+// undefined. С 3.x шаблон — {userId}, числовой id: uuid у пользователя больше нет.
 requests.length = 0;
-nextResponse = { response: { uuid: 'u-1', username: 'ivan' } };
-await resHandlers.get('user-details')!({ href: 'remnawave://users/u-1' }, { uuid: 'u-1' });
-check('ресурс user-details берёт uuid из шаблона, а не несуществующий userId',
-    requests[0]?.url.endsWith('/api/users/u-1'), requests[0]?.url);
+nextResponse = { response: { id: 118, username: 'ivan' } };
+await resHandlers.get('user-details')!({ href: 'remnawave://users/118' }, { userId: '118' });
+check('ресурс user-details берёт userId из шаблона',
+    requests[0]?.url.endsWith('/api/users/118'), requests[0]?.url);
 
 // structuredContent — отдельная ветка ответа, JSON.stringify кладёт её в расшифровку так же.
 const structHandlers = new Map<string, Handler>();
@@ -513,6 +515,30 @@ await handlers.get('config_profiles_update')!({
 check('конфиг без заглушек заливается как раньше',
     requests.length === 1 && requests[0].method === 'PATCH',
     JSON.stringify(requests[0]?.method));
+
+// --- 3.4: заглушку вычистки не записать ни одним мутирующим тулом ---------------
+// Суффиксная вычистка (clientSecret, botToken…) довозит заглушку до многих тулов: модель читает
+// объект и заливает его обратно. Отказ стоит в обёртке — проверяем на тулах без своей защиты.
+registerNodeIntegrationTools(withAnnotations(annServer), client, false);
+requests.length = 0;
+const guarded = await annHandlers.get('node_integrations_update')!({
+    uuid: '00000000-0000-0000-0000-000000000001',
+    config: { telegram: { botToken: '«вычищено сервером MCP»' } },
+});
+check('заглушка вычистки в мутирующем туле — отказ без запроса к панели',
+    guarded?.isError === true && requests.length === 0,
+    String(guarded?.content?.[0]?.text).slice(0, 90));
+
+nextResponse = { response: { uuid: 'i1', config: { telegram: { botToken: '123:СЕКРЕТ-БОТА' } } } };
+const integration = await annHandlers.get('node_integrations_get')!({ uuid: 'i1' });
+check('ключ по окончанию имени (botToken) вычищен из ответа',
+    !JSON.stringify(integration).includes('СЕКРЕТ-БОТА'), String(integration?.content?.[0]?.text).slice(0, 90));
+
+nextResponse = { response: [{ uuid: 'n1', name: 'ru1', proxyUrl: 'socks5://user:ПАРОЛЬ-ПРОКСИ@10.0.0.1:1080' }] };
+const withProxy = await annHandlers.get('nodes_list')!({});
+check('пароль внутри proxyUrl вычищен, адрес остался',
+    !JSON.stringify(withProxy).includes('ПАРОЛЬ-ПРОКСИ') && JSON.stringify(withProxy).includes('10.0.0.1:1080'),
+    String(withProxy?.content?.[0]?.text).slice(0, 120));
 
 console.log(failed === 0 ? '\nВСЕ ПРОВЕРКИ ПРОЙДЕНЫ' : `\nПРОВАЛОВ: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

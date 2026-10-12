@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RemnawaveClient } from '../client/index.js';
-import { toolResult, toolError } from './helpers.js';
+import { toolResult, toolError, tagList } from './helpers.js';
 
 export function registerSubPageConfigTools(server: McpServer, client: RemnawaveClient, readonly: boolean) {
     server.tool('sub_page_configs_list', 'List all subscription page configurations', {}, async () => {
@@ -12,6 +12,10 @@ export function registerSubPageConfigTools(server: McpServer, client: RemnawaveC
         uuid: z.string().uuid().describe('Config UUID'),
     }, async ({ uuid }) => {
         try { return toolResult(await client.getSubscriptionPageConfig(uuid)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('sub_page_configs_tags_list', 'List all tags used by subscription page configs', {}, async () => {
+        try { return toolResult(await client.getSubscriptionPageConfigTags()); } catch (e) { return toolError(e); }
     });
 
     if (readonly) return;
@@ -55,5 +59,12 @@ export function registerSubPageConfigTools(server: McpServer, client: RemnawaveC
         cloneFromUuid: z.string().uuid().describe('Config UUID to clone'),
     }, async (params) => {
         try { return toolResult(await client.cloneSubscriptionPageConfig(params)); } catch (e) { return toolError(e); }
+    });
+
+    server.tool('sub_page_configs_set_tags', 'Set tags of one subscription page config — REPLACES its whole tag set', {
+        uuid: z.string().uuid().describe('UUID'),
+        tags: tagList.describe('Tags, up to 10: A-Z, 0-9, _ and : only, each up to 36 chars; [] clears'),
+    }, async (params) => {
+        try { return toolResult(await client.setSubscriptionPageConfigTags(params)); } catch (e) { return toolError(e); }
     });
 }

@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RemnawaveClient } from '../client/index.js';
-import { toolResult, toolError } from './helpers.js';
+import { toolResult, toolError, tagList } from './helpers.js';
 
 /** Маркер, которым `annotate.ts` заменяет секреты в ответе модели. */
 const REDACTED = '«вычищено сервером MCP»';
@@ -121,6 +121,10 @@ export function registerInboundTools(
         },
     );
 
+    server.tool('config_profiles_tags_list', 'List all tags used by config profiles', {}, async () => {
+        try { return toolResult(await client.getConfigProfileTags()); } catch (e) { return toolError(e); }
+    });
+
     if (readonly) return;
 
     server.tool(
@@ -219,4 +223,11 @@ export function registerInboundTools(
             }
         },
     );
+
+    server.tool('config_profiles_set_tags', 'Set tags of one config profile — REPLACES its whole tag set', {
+        uuid: z.string().uuid().describe('UUID'),
+        tags: tagList.describe('Tags, up to 10: A-Z, 0-9, _ and : only, each up to 36 chars; [] clears'),
+    }, async (params) => {
+        try { return toolResult(await client.setConfigProfileTags(params)); } catch (e) { return toolError(e); }
+    });
 }

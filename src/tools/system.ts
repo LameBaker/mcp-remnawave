@@ -155,6 +155,37 @@ export function registerSystemTools(
     );
 
     server.tool(
+        'system_configuration',
+        'Panel configuration from its environment: which notifications, webhooks and integrations are enabled and their thresholds',
+        {},
+        async () => {
+            try {
+                const result = await client.getSystemConfiguration();
+                return toolResult(result);
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.tool(
+        'system_stats_digest',
+        'Digest for a time range: users created and expired, traffic total and by new users, and more',
+        {
+            start: z.string().datetime({ offset: true }).describe('Range start, ISO 8601 with timezone, inclusive (e.g. 2026-10-01T00:00:00+03:00)'),
+            end: z.string().datetime({ offset: true }).describe('Range end, ISO 8601 with timezone, exclusive'),
+        },
+        async (params) => {
+            try {
+                const result = await client.getStatsDigest(params);
+                return toolResult(result);
+            } catch (e) {
+                return toolError(e);
+            }
+        },
+    );
+
+    server.tool(
         'system_srr_matcher',
         'Test subscription request routing rules',
         {

@@ -25,15 +25,15 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "@remnawave/backend-contract": "^3.2.0",
-    "zod": "^3.25.76"
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@remnawave/backend-contract": "^3.4.15",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "esbuild": "^0.27.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.7.0"
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=22.0.0"

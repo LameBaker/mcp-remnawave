@@ -12,14 +12,14 @@ export function registerSnippetTools(server: McpServer, client: RemnawaveClient,
 
     server.tool('snippets_create', 'Create a new configuration snippet', {
         name: z.string().describe('Snippet name'),
-        snippet: z.array(z.record(z.unknown())).describe('Snippet content as array of objects'),
+        snippet: z.array(z.record(z.string(), z.unknown())).describe('Snippet content as array of objects'),
     }, async (params) => {
         try { return toolResult(await client.createSnippet(params)); } catch (e) { return toolError(e); }
     });
 
     server.tool('snippets_update', 'Update an existing snippet', {
         name: z.string().describe('Snippet name (identifies the snippet to update)'),
-        snippet: z.array(z.record(z.unknown())).optional().describe('New snippet content as array of objects'),
+        snippet: z.array(z.record(z.string(), z.unknown())).optional().describe('New snippet content as array of objects'),
     }, async (params) => {
         try { return toolResult(await client.updateSnippet(params)); } catch (e) { return toolError(e); }
     });

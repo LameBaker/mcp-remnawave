@@ -36,7 +36,7 @@ export function registerNodePluginTools(server: McpServer, client: RemnawaveClie
         uuid: z.string().uuid().describe('Plugin UUID'),
         name: z.string().optional().describe('New name'),
         pluginConfig: z
-            .record(z.unknown())
+            .record(z.string(), z.unknown())
             .optional()
             .describe('Plugin config object: torrentBlocker, ingressFilter, egressFilter, connectionDrop, sharedLists'),
     }, async ({ uuid, name, pluginConfig }) => {

@@ -20,7 +20,7 @@ export function registerSettingsTools(server: McpServer, client: RemnawaveClient
     if (readonly) return;
 
     server.tool('settings_update', 'Update Remnawave panel settings', {
-        settings: z.record(z.unknown()).describe('Settings key-value pairs to update'),
+        settings: z.record(z.string(), z.unknown()).describe('Settings key-value pairs to update'),
     }, async ({ settings }) => {
         try { return toolResult(await client.updateSettings(settings)); } catch (e) { return toolError(e); }
     });
@@ -31,11 +31,11 @@ export function registerSettingsTools(server: McpServer, client: RemnawaveClient
         {
             serveJsonAtBaseSubscription: z.boolean().optional().describe('Serve JSON at base subscription URL'),
             isShowCustomRemarks: z.boolean().optional().describe('Show custom remarks'),
-            customRemarks: z.record(z.unknown()).optional().describe('Custom remarks object (expired, disabled, limited, HWIDNotSupported, ...)'),
-            customResponseHeaders: z.record(z.unknown()).optional().describe('Custom response headers sent to clients (announce, profile-*, flclashx-*)'),
+            customRemarks: z.record(z.string(), z.unknown()).optional().describe('Custom remarks object (expired, disabled, limited, HWIDNotSupported, ...)'),
+            customResponseHeaders: z.record(z.string(), z.unknown()).optional().describe('Custom response headers sent to clients (announce, profile-*, flclashx-*)'),
             randomizeHosts: z.boolean().optional().describe('Randomize host order in subscription'),
-            responseRules: z.record(z.unknown()).optional().describe('SRR rules: which client user-agent gets which template'),
-            hwidSettings: z.record(z.unknown()).optional().describe('HWID policy settings'),
+            responseRules: z.record(z.string(), z.unknown()).optional().describe('SRR rules: which client user-agent gets which template'),
+            hwidSettings: z.record(z.string(), z.unknown()).optional().describe('HWID policy settings'),
         },
         async (params) => {
             try {

@@ -190,6 +190,34 @@ export function registerNodeTools(server: McpServer, client: RemnawaveClient, re
                 .string()
                 .nullish()
                 .describe('Free-form note, up to 255 chars, null to clear'),
+            integrationUuids: z
+                .array(z.string().uuid())
+                .max(20)
+                .optional()
+                .describe('Node integration UUIDs, up to 20'),
+            ips: z
+                .array(
+                    z.object({
+                        ip: z.union([z.ipv4(), z.ipv6()]).describe('IPv4 or IPv6 address'),
+                        status: z
+                            .enum([
+                                'INBOUND',
+                                'OUTBOUND',
+                                'MANAGEMENT',
+                                'TRANSIT',
+                                'MONITORING',
+                                'RESERVE',
+                                'BLOCKED',
+                                'FLAGGED',
+                                'DEPRECATED',
+                                'UNKNOWN',
+                            ])
+                            .describe('Role of this IP on the node'),
+                    }),
+                )
+                .max(64)
+                .optional()
+                .describe('Full list of node IPs with their roles, up to 64'),
         },
         async (params) => {
             try {

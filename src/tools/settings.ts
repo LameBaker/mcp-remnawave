@@ -114,7 +114,7 @@ export function registerSettingsTools(server: McpServer, client: RemnawaveClient
                 const body: Record<string, unknown> = Object.fromEntries(
                     Object.entries(merged).filter(([, value]) => value !== null),
                 );
-                for (const [key, value] of Object.entries(params)) {
+                for (let [key, value] of Object.entries(params)) {
                     if (value === undefined) continue;
                     // customRemarks и hwidSettings контракт принимает только целиком — частичную
                     // правку накладываем на текущее значение, иначе панель отклонит тело.
@@ -123,6 +123,13 @@ export function registerSettingsTools(server: McpServer, client: RemnawaveClient
                     // не сливаем: правила SRR — упорядоченный массив rules, слияние по ключам
                     // верхнего уровня всё равно заменило бы его целиком, а «дописать правило»
                     // без порядка опасно. Агент передаёт конфиг полностью, как его вернул get.
+                    // Панель хранит имена заголовков в нижнем регистре: без приведения
+                    // Profile-Title не заменил бы и не удалил profile-title.
+                    if (key === 'customResponseHeaders' && value && typeof value === 'object') {
+                        value = Object.fromEntries(
+                            Object.entries(value as Record<string, unknown>).map(([k, v]) => [k.toLowerCase(), v]),
+                        );
+                    }
                     const was = body[key];
                     body[key] =
                         (key === 'customRemarks' || key === 'hwidSettings' || key === 'customResponseHeaders') &&

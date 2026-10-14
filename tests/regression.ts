@@ -206,12 +206,13 @@ nextResponse = {
     },
 };
 await handlers.get('subscription_settings_update')!({
-    customResponseHeaders: { 'profile-title': 'RWXRAY', 'flclashx-hex': null },
+    customResponseHeaders: { 'Profile-Title': 'RWXRAY', 'FlClashX-Hex': null },
 });
 const headers = requests[1]?.body?.customResponseHeaders ?? {};
 check('новый заголовок добавлен', headers['profile-title'] === 'RWXRAY', JSON.stringify(headers));
 check('прочие заголовки сохранены', headers.announce === 'старый текст' && headers['profile-update-interval'] === '1');
 check('null удаляет заголовок', !('flclashx-hex' in headers));
+check('имена заголовков приведены к нижнему регистру', !('Profile-Title' in headers) && !('FlClashX-Hex' in headers));
 
 requests.length = 0;
 nextResponse = { response: { ...SETTINGS, customResponseHeaders: null } };

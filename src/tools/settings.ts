@@ -72,12 +72,17 @@ export function registerSettingsTools(server: McpServer, client: RemnawaveClient
                 })
                 .optional()
                 .describe('Custom remarks shown instead of hosts; pass only the lists that change, the rest are kept'),
+            // Префикс rwEncodeBase64: панель сама превращает в base64:<utf8 в base64> после подстановки
+            // {{ШАБЛОНОВ}} — remnawave/backend src/common/utils/templates/template-parser.ts
+            // (TemplateEngine.replace в getUserProfileHeadersInfo, src/modules/subscription/subscription.service.ts).
             customResponseHeaders: z
                 .record(z.string(), z.string().nullable())
                 .optional()
                 .describe(
                     'Custom response headers sent to clients (announce, profile-*, flclashx-*). Merged into the current ' +
-                        'headers: pass only the headers that change, the rest are kept; a null value removes that header',
+                        'headers: pass only the headers that change, the rest are kept; a null value removes that header. ' +
+                        'Values support {{TEMPLATE}} variables; for non-ASCII text use the rwEncodeBase64: prefix, e.g. ' +
+                        '"profile-title": "rwEncodeBase64:<text>" — the panel sends it as base64:<utf8 text in base64>',
                 ),
             randomizeHosts: z.boolean().optional().describe('Randomize host order in subscription'),
             responseRules: z

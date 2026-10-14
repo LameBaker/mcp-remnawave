@@ -72,10 +72,22 @@ export function registerSettingsTools(server: McpServer, client: RemnawaveClient
                 })
                 .optional()
                 .describe('Custom remarks shown instead of hosts; pass only the lists that change, the rest are kept'),
-            customResponseHeaders: z.record(z.string(), z.unknown()).optional().describe('Custom response headers sent to clients (announce, profile-*, flclashx-*)'),
+            customResponseHeaders: z
+                .record(z.string(), z.string().nullable())
+                .optional()
+                .describe(
+                    'Custom response headers sent to clients (announce, profile-*, flclashx-*). Merged into the current ' +
+                        'headers: pass only the headers that change, the rest are kept; a null value removes that header',
+                ),
             randomizeHosts: z.boolean().optional().describe('Randomize host order in subscription'),
-            responseRules: z.record(z.string(), z.unknown()).optional().describe('SRR rules: which client user-agent gets which template'),
-            hwidSettings: z.record(z.string(), z.unknown()).optional().describe('HWID policy settings'),
+            responseRules: z
+                .record(z.string(), z.unknown())
+                .optional()
+                .describe('SRR rules: which client user-agent gets which template. Replaces the whole config — pass it in full'),
+            hwidSettings: z
+                .record(z.string(), z.unknown())
+                .optional()
+                .describe('HWID policy settings; pass only the fields that change, the rest are kept'),
         },
         async (params) => {
             try {
@@ -101,12 +113,25 @@ export function registerSettingsTools(server: McpServer, client: RemnawaveClient
                     if (value === undefined) continue;
                     // customRemarks и hwidSettings контракт принимает только целиком — частичную
                     // правку накладываем на текущее значение, иначе панель отклонит тело.
+                    // customResponseHeaders — тоже поверх текущих: один переданный заголовок не
+                    // должен стирать profile-update-interval, flclashx-* и announce. responseRules
+                    // не сливаем: правила SRR — упорядоченный массив rules, слияние по ключам
+                    // верхнего уровня всё равно заменило бы его целиком, а «дописать правило»
+                    // без порядка опасно. Агент передаёт конфиг полностью, как его вернул get.
                     const was = body[key];
                     body[key] =
-                        (key === 'customRemarks' || key === 'hwidSettings') &&
+                        (key === 'customRemarks' || key === 'hwidSettings' || key === 'customResponseHeaders') &&
                         was && typeof was === 'object' && value && typeof value === 'object'
                             ? { ...(was as object), ...(value as object) }
                             : value;
+                }
+                // null у заголовка значит «удалить»: значений null контракт не принимает, ключ убираем.
+                if (body.customResponseHeaders && typeof body.customResponseHeaders === 'object') {
+                    body.customResponseHeaders = Object.fromEntries(
+                        Object.entries(body.customResponseHeaders as Record<string, unknown>).filter(
+                            ([, value]) => value !== null,
+                        ),
+                    );
                 }
 
                 return toolResult(await client.updateSubscriptionSettings(body));

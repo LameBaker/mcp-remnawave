@@ -230,7 +230,7 @@ export function registerNodeTools(server: McpServer, client: RemnawaveClient, re
 
     server.tool(
         'nodes_delete',
-        'Delete a node from Remnawave',
+        'Delete a node from Remnawave. The panel removes it asynchronously: the node may stay in nodes_list for a while, and its config profile cannot be deleted until it is gone',
         {
             uuid: z.string().uuid().describe('Node UUID to delete'),
         },

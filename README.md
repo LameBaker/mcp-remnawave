@@ -196,7 +196,7 @@ Environment variables are passed via `.env` file or `docker-compose.yml`.
 | `nodes_tags_list` | List all node tags | read |
 | `nodes_create` | Create a new node in Remnawave | write |
 | `nodes_update` | Update an existing node | write |
-| `nodes_delete` | Delete a node from Remnawave | write |
+| `nodes_delete` | Delete a node from Remnawave. The panel removes it asynchronously: the node may stay in nodes_list for a while, and its config profile cannot be deleted until it is gone | write |
 | `nodes_enable` | Enable a disabled node | write |
 | `nodes_disable` | Disable a node | write |
 | `nodes_restart` | Restart a specific node. Causes ~12s of downtime on :443 for that node when forceRestart is true | write |
@@ -271,7 +271,7 @@ Environment variables are passed via `.env` file or `docker-compose.yml`.
 | `config_profiles_tags_list` | List all tags used by config profiles | read |
 | `config_profiles_create` | Create a new config profile | write |
 | `config_profiles_update` | Update a config profile | write |
-| `config_profiles_delete` | Delete a config profile | write |
+| `config_profiles_delete` | Delete a config profile. A profile still used by a node cannot be deleted; after nodes_delete wait until the node disappears from nodes_list (deletion is asynchronous) | write |
 | `config_profiles_reorder` | Reorder config profiles | write |
 | `config_profiles_set_tags` | Set tags of one config profile — REPLACES its whole tag set | write |
 
@@ -738,7 +738,7 @@ docker compose up -d
 | `nodes_tags_list` | List all node tags | read |
 | `nodes_create` | Create a new node in Remnawave | write |
 | `nodes_update` | Update an existing node | write |
-| `nodes_delete` | Delete a node from Remnawave | write |
+| `nodes_delete` | Delete a node from Remnawave. The panel removes it asynchronously: the node may stay in nodes_list for a while, and its config profile cannot be deleted until it is gone | write |
 | `nodes_enable` | Enable a disabled node | write |
 | `nodes_disable` | Disable a node | write |
 | `nodes_restart` | Restart a specific node. Causes ~12s of downtime on :443 for that node when forceRestart is true | write |
@@ -813,7 +813,7 @@ docker compose up -d
 | `config_profiles_tags_list` | List all tags used by config profiles | read |
 | `config_profiles_create` | Create a new config profile | write |
 | `config_profiles_update` | Update a config profile | write |
-| `config_profiles_delete` | Delete a config profile | write |
+| `config_profiles_delete` | Delete a config profile. A profile still used by a node cannot be deleted; after nodes_delete wait until the node disappears from nodes_list (deletion is asynchronous) | write |
 | `config_profiles_reorder` | Reorder config profiles | write |
 | `config_profiles_set_tags` | Set tags of one config profile — REPLACES its whole tag set | write |
 

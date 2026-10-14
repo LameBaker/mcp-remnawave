@@ -197,6 +197,46 @@ check('uuid отправлен', settingsWrite?.body?.uuid === 'settings-1');
 check('createdAt/updatedAt не отправлены',
     !('createdAt' in (settingsWrite?.body ?? {})) && !('updatedAt' in (settingsWrite?.body ?? {})));
 
+// Заголовки сливаются с текущими: один переданный не стирает остальные, null удаляет ключ.
+requests.length = 0;
+nextResponse = {
+    response: {
+        ...SETTINGS,
+        customResponseHeaders: { announce: 'старый текст', 'profile-update-interval': '1', 'flclashx-hex': '564FFF' },
+    },
+};
+await handlers.get('subscription_settings_update')!({
+    customResponseHeaders: { 'profile-title': 'RWXRAY', 'flclashx-hex': null },
+});
+const headers = requests[1]?.body?.customResponseHeaders ?? {};
+check('новый заголовок добавлен', headers['profile-title'] === 'RWXRAY', JSON.stringify(headers));
+check('прочие заголовки сохранены', headers.announce === 'старый текст' && headers['profile-update-interval'] === '1');
+check('null удаляет заголовок', !('flclashx-hex' in headers));
+
+requests.length = 0;
+nextResponse = { response: { ...SETTINGS, customResponseHeaders: null } };
+await handlers.get('subscription_settings_update')!({ customResponseHeaders: { announce: 'текст', 'profile-title': null } });
+check('при null в ответе панели — только переданные заголовки без null',
+    JSON.stringify(requests[1]?.body?.customResponseHeaders) === '{"announce":"текст"}',
+    JSON.stringify(requests[1]?.body?.customResponseHeaders));
+
+requests.length = 0;
+nextResponse = { response: SETTINGS };
+await handlers.get('subscription_settings_update')!({ responseRules: { rules: [{ name: 'Happ' }] } });
+check('responseRules заменяются целиком', requests[1]?.body?.responseRules?.rules?.length === 1);
+
+// --- 5a. hosts_update: явный null сбрасывает поле -----------------------------
+console.log('\n5a. hosts_update — null сбрасывает поле к наследованию');
+requests.length = 0;
+nextResponse = { response: { ...HOST, sni: 'donor.example', path: '/ws', serverDescription: 'NL', xrayJsonTemplateUuid: 'tpl-1' } };
+await handlers.get('hosts_update')!({ uuid: 'host-1', sni: null, path: null, xrayJsonTemplateUuid: null });
+const hostReset = requests[1]?.body ?? {};
+check('sni уходит null', 'sni' in hostReset && hostReset.sni === null, JSON.stringify(hostReset.sni));
+check('path уходит null', 'path' in hostReset && hostReset.path === null);
+check('xrayJsonTemplateUuid уходит null', 'xrayJsonTemplateUuid' in hostReset && hostReset.xrayJsonTemplateUuid === null);
+check('непереданное serverDescription сохранено', hostReset.serverDescription === 'NL');
+check('isDisabled сохранён', hostReset.isDisabled === true);
+
 // --- 6. сквады: поштучно ≠ «весь парк» --------------------------------------
 // add-users/remove-users в 3.x означают «все пользователи панели» и тела не
 // принимают. Слать туда список — молча раздать доступ всему парку.

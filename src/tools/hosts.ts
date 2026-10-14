@@ -234,13 +234,15 @@ export function registerHostTools(server: McpServer, client: RemnawaveClient, re
             port: z.number().optional().describe('New port'),
             configProfileUuid: z.string().optional().describe('New config profile UUID'),
             configProfileInboundUuid: z.string().optional().describe('New config profile inbound UUID'),
-            path: z.string().optional().describe('New URL path'),
-            sni: z.string().optional().describe('New SNI'),
-            host: z.string().optional().describe('New host header'),
+            // null у полей ниже сбрасывает их (path, sni, host — к значению инбаунда): тело
+            // собирается поверх текущего хоста, и без явного null сбросить поле было нельзя.
+            path: z.string().nullish().describe('New URL path, null to inherit from the inbound'),
+            sni: z.string().nullish().describe('New SNI, null to inherit from the inbound'),
+            host: z.string().nullish().describe('New host header, null to inherit from the inbound'),
             alpn: z
                 .enum(['h3', 'h2', 'http/1.1', 'h2,http/1.1', 'h3,h2,http/1.1', 'h3,h2'])
-                .optional()
-                .describe('New ALPN'),
+                .nullish()
+                .describe('New ALPN, null to clear'),
             fingerprint: z
                 .enum([
                     'chrome',
@@ -253,8 +255,8 @@ export function registerHostTools(server: McpServer, client: RemnawaveClient, re
                     'random',
                     'randomized',
                 ])
-                .optional()
-                .describe('New fingerprint'),
+                .nullish()
+                .describe('New fingerprint, null to clear'),
             isDisabled: z
                 .boolean()
                 .optional()
@@ -272,8 +274,8 @@ export function registerHostTools(server: McpServer, client: RemnawaveClient, re
                 .describe('New tags (replaces the whole set). Panel accepts A-Z, 0-9, _ and : only'),
             serverDescription: z
                 .string()
-                .optional()
-                .describe('New server description'),
+                .nullish()
+                .describe('New server description, null to clear'),
             nodes: uuidList
                 .optional()
                 .describe('New node UUIDs'),
@@ -283,8 +285,8 @@ export function registerHostTools(server: McpServer, client: RemnawaveClient, re
                 .describe('Subscription types to exclude this host from'),
             xrayJsonTemplateUuid: z
                 .string()
-                .optional()
-                .describe('Xray JSON template UUID'),
+                .nullish()
+                .describe('Xray JSON template UUID, null for the default template'),
             // 3.4: список «исключить из сквадов» стал правилом с режимом. Прежнее поле
             // `excludedInternalSquads` панель 3.4 молча отбрасывает.
             internalSquads: z
@@ -304,8 +306,8 @@ export function registerHostTools(server: McpServer, client: RemnawaveClient, re
                 .describe('Keep SNI field blank'),
             vlessRouteId: z
                 .number()
-                .optional()
-                .describe('VLESS route ID (0-65535)'),
+                .nullish()
+                .describe('VLESS route ID (0-65535), null to clear'),
             shuffleHost: z
                 .boolean()
                 .optional()
@@ -347,6 +349,7 @@ export function registerHostTools(server: McpServer, client: RemnawaveClient, re
                 if (!squads || (squads.mode === 'ALLOW_ONLY' && !squads.squads?.length)) {
                     delete body.internalSquads;
                 }
+                // Явный null проходит в тело как есть — так поле сбрасывается.
                 for (const [key, value] of Object.entries(fields)) {
                     if (value !== undefined) body[key] = value;
                 }

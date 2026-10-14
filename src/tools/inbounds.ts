@@ -191,7 +191,7 @@ export function registerInboundTools(
 
     server.tool(
         'config_profiles_delete',
-        'Delete a config profile',
+        'Delete a config profile. A profile still used by a node cannot be deleted; after nodes_delete wait until the node disappears from nodes_list (deletion is asynchronous)',
         {
             uuid: z.string().uuid().describe('Profile UUID'),
         },
